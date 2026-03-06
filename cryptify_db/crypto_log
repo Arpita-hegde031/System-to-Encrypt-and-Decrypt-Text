@@ -1,0 +1,10 @@
+CREATE TABLE crypto_log (
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    action_type  ENUM('ENCRYPT','DECRYPT') NOT NULL,
+    target_type  ENUM('TEXT','FILE','EMAIL','DATABASE') NOT NULL,
+    status       ENUM('SUCCESS','FAILED') DEFAULT 'SUCCESS',
+    algorithm    VARCHAR(50) DEFAULT 'AES-256-GCM',
+    timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id      BIGINT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
