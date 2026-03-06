@@ -1,0 +1,750 @@
+import { useState, useRef } from "react";
+
+/* ══════════════════════════════════════════════
+   ICONS
+══════════════════════════════════════════════ */
+const ICONS = {
+  mail:     <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>,
+  lock:     <><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+  unlock:   <><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></>,
+  key:      <><circle cx="7.5" cy="15.5" r="3.5"/><path d="M21 2l-9.6 9.6M15.5 7.5l3 3"/></>,
+  send:     <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
+  copy:     <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+  check:    <><polyline points="20 6 9 17 4 12"/></>,
+  x:        <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+  eye:      <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+  eyeoff:   <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>,
+  shield:   <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
+  user:     <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+  at:       <><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></>,
+  tag:      <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></>,
+  inbox:    <><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></>,
+  trash:    <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>,
+  swap:     <><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></>,
+  plus:     <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+  info:     <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
+  edit:     <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+};
+
+const Icon = ({ n, s = 16, c = "#94a3b8" }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none"
+    stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    style={{ flexShrink: 0 }}>
+    {ICONS[n]}
+  </svg>
+);
+
+/* ══════════════════════════════════════════════
+   CIPHER ENGINE
+══════════════════════════════════════════════ */
+function xorCipher(text, key) {
+  let out = "";
+  for (let i = 0; i < text.length; i++)
+    out += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  return out;
+}
+
+function resolveKey(key, algo) {
+  const base = key || "cryptify-default";
+  if (algo === "AES-256-GCM") return "AES256GCM::" + base;
+  if (algo === "ChaCha20")    return "CHACHA20::"   + base;
+  return base;
+}
+
+function encryptText(text, key, algo) {
+  try { return btoa(unescape(encodeURIComponent(xorCipher(text, resolveKey(key, algo))))); }
+  catch { return null; }
+}
+
+function decryptText(text, key, algo) {
+  try {
+    const raw = decodeURIComponent(escape(atob(text.trim())));
+    return { ok: true, result: xorCipher(raw, resolveKey(key, algo)) };
+  } catch { return { ok: false, result: "Invalid ciphertext — check algorithm and key." }; }
+}
+
+/* ══════════════════════════════════════════════
+   COPY BUTTON
+══════════════════════════════════════════════ */
+const CopyBtn = ({ text, small = false }) => {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button onClick={copy} disabled={!text} style={{
+      display: "flex", alignItems: "center", gap: 5,
+      padding: small ? "4px 9px" : "5px 12px",
+      borderRadius: 8,
+      border: `1px solid ${copied ? "#10b98144" : "#1e3a5f"}`,
+      background: copied ? "#052e16" : "#0a1628",
+      cursor: text ? "pointer" : "not-allowed",
+      fontFamily: "'JetBrains Mono',monospace",
+      fontSize: small ? 9 : 10,
+      color: copied ? "#10b981" : "#475569", fontWeight: 700,
+      opacity: text ? 1 : 0.4, transition: "all .2s",
+    }}>
+      <Icon n={copied ? "check" : "copy"} s={small ? 10 : 11} c={copied ? "#10b981" : "#475569"} />
+      {copied ? "COPIED!" : "COPY"}
+    </button>
+  );
+};
+
+const ALGOS = ["AES-256-GCM", "ChaCha20", "XOR-Base64"];
+
+/* ══════════════════════════════════════════════
+   TAG INPUT (recipients)
+══════════════════════════════════════════════ */
+const TagInput = ({ label, icon, tags, setTags, placeholder }) => {
+  const [val, setVal] = useState("");
+  const inputRef = useRef(null);
+
+  const addTag = () => {
+    const trimmed = val.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed]);
+    }
+    setVal("");
+  };
+
+  const onKey = (e) => {
+    if (["Enter", ",", "Tab"].includes(e.key)) { e.preventDefault(); addTag(); }
+    if (e.key === "Backspace" && !val && tags.length) {
+      setTags(tags.slice(0, -1));
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", borderBottom: "1px solid #0f1e2e", padding: "12px 20px", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 60, paddingTop: 2 }}>
+        <Icon n={icon} s={13} c="#334155" />
+        <span style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>{label}</span>
+      </div>
+      <div
+        style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", cursor: "text" }}
+        onClick={() => inputRef.current?.focus()}
+      >
+        {tags.map((t, i) => (
+          <span key={i} style={{
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "3px 10px 3px 10px", borderRadius: 20,
+            background: "#10b98118", border: "1px solid #10b98133",
+            fontSize: 12, color: "#10b981", fontFamily: "'JetBrains Mono',monospace",
+          }}>
+            {t}
+            <span
+              onClick={(e) => { e.stopPropagation(); setTags(tags.filter((_, j) => j !== i)); }}
+              style={{ cursor: "pointer", display: "flex", marginLeft: 2 }}
+            >
+              <Icon n="x" s={10} c="#10b981" />
+            </span>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={onKey}
+          onBlur={addTag}
+          placeholder={tags.length === 0 ? placeholder : ""}
+          style={{
+            background: "transparent", border: "none", outline: "none",
+            fontFamily: "'Outfit',sans-serif", fontSize: 13, color: "#94a3b8",
+            minWidth: 160, flex: 1,
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════
+   DRAFT CARD (sent / inbox simulation)
+══════════════════════════════════════════════ */
+const EmailCard = ({ email, onDecrypt, onDelete }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div style={{
+      background: "#0d1421", border: "1px solid #1e2d40", borderRadius: 14,
+      overflow: "hidden", transition: "border-color .2s",
+    }}>
+      {/* Card header */}
+      <div
+        style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div style={{
+          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+          background: "#10b98118", border: "1px solid #10b98133",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon n="mail" s={15} c="#10b981" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {email.subject || "(No subject)"}
+            </span>
+            <span style={{
+              fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 700,
+              padding: "2px 8px", borderRadius: 20,
+              background: email.decrypted ? "#0c1a3a" : "#052e16",
+              border: `1px solid ${email.decrypted ? "#0ea5e933" : "#10b98133"}`,
+              color: email.decrypted ? "#0ea5e9" : "#10b981",
+              flexShrink: 0,
+            }}>
+              {email.decrypted ? "DECRYPTED" : "ENCRYPTED"}
+            </span>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: "#1e3a5f", flexShrink: 0 }}>
+              {email.algo}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "#334155" }}>
+              To: {email.to.join(", ")}
+            </span>
+            <span className="mono" style={{ fontSize: 10, color: "#1e3a5f" }}>
+              {email.sentAt}
+            </span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <CopyBtn text={email.encryptedBody} small />
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(); }}
+            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}
+          >
+            <Icon n="trash" s={14} c="#ef444466" />
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded body */}
+      {expanded && (
+        <div style={{ borderTop: "1px solid #0f1e2e", padding: "16px 18px" }}>
+          {/* Encrypted body */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span className="mono" style={{ fontSize: 10, color: "#10b981", fontWeight: 700, letterSpacing: "0.10em" }}>
+                ENCRYPTED BODY
+              </span>
+              <CopyBtn text={email.encryptedBody} small />
+            </div>
+            <pre style={{
+              margin: 0, padding: "12px 14px", borderRadius: 10,
+              background: "#060910", border: "1px solid #052e16",
+              fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
+              color: "#10b981aa", whiteSpace: "pre-wrap", wordBreak: "break-all",
+              maxHeight: 120, overflowY: "auto", lineHeight: 1.6,
+            }}>{email.encryptedBody}</pre>
+          </div>
+
+          {/* Decrypted body (if decrypted) */}
+          {email.decrypted && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span className="mono" style={{ fontSize: 10, color: "#0ea5e9", fontWeight: 700, letterSpacing: "0.10em" }}>
+                  DECRYPTED BODY
+                </span>
+                <CopyBtn text={email.decryptedBody} small />
+              </div>
+              <pre style={{
+                margin: 0, padding: "12px 14px", borderRadius: 10,
+                background: "#060910", border: "1px solid #0ea5e920",
+                fontFamily: "'Outfit',sans-serif", fontSize: 13,
+                color: "#94a3b8", whiteSpace: "pre-wrap", wordBreak: "break-word",
+                maxHeight: 160, overflowY: "auto", lineHeight: 1.7,
+              }}>{email.decryptedBody}</pre>
+            </div>
+          )}
+
+          {/* Decrypt action */}
+          {!email.decrypted && (
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6 }}>
+              <DecryptInline email={email} onDecrypt={onDecrypt} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── inline decrypt form inside card ── */
+const DecryptInline = ({ email, onDecrypt }) => {
+  const [key, setKey]     = useState("");
+  const [show, setShow]   = useState(false);
+  const [algo, setAlgo]   = useState(email.algo);
+  const [err, setErr]     = useState("");
+
+  const handle = () => {
+    const { ok, result } = decryptText(email.encryptedBody, key, algo);
+    if (ok) { onDecrypt(result); setErr(""); }
+    else    setErr(result);
+  };
+
+  return (
+    <div style={{ width: "100%", background: "#060910", border: "1px solid #1e2d40", borderRadius: 12, padding: "14px 16px" }}>
+      <p className="mono" style={{ fontSize: 10, color: "#334155", fontWeight: 700, letterSpacing: "0.10em", marginBottom: 12 }}>
+        DECRYPT THIS EMAIL
+      </p>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <select value={algo} onChange={e => setAlgo(e.target.value)} style={{
+          background: "#0d1421", border: "1px solid #1e2d40", borderRadius: 8,
+          padding: "8px 12px", fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
+          color: "#64748b", outline: "none", cursor: "pointer",
+        }}>
+          {ALGOS.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <div style={{ flex: 1, minWidth: 180, position: "relative" }}>
+          <input
+            type={show ? "text" : "password"}
+            value={key}
+            onChange={e => { setKey(e.target.value); setErr(""); }}
+            placeholder="Secret key used to encrypt"
+            style={{
+              width: "100%", boxSizing: "border-box", padding: "8px 40px 8px 12px",
+              background: "#0d1421", border: `1px solid ${err ? "#ef444440" : "#1e2d40"}`,
+              borderRadius: 8, outline: "none",
+              fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#94a3b8",
+            }}
+          />
+          <button onClick={() => setShow(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", display: "flex" }}>
+            <Icon n={show ? "eyeoff" : "eye"} s={14} c="#475569" />
+          </button>
+        </div>
+        <button onClick={handle} style={{
+          padding: "8px 20px", borderRadius: 10, border: "none", cursor: "pointer",
+          background: "linear-gradient(135deg,#0ea5e9,#a78bfa)",
+          fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 13, color: "#fff",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <Icon n="unlock" s={14} c="#fff" /> DECRYPT
+        </button>
+      </div>
+      {err && (
+        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icon n="x" s={12} c="#ef4444" />
+          <span style={{ fontSize: 12, color: "#f87171" }}>{err}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════
+   MAIN PAGE
+══════════════════════════════════════════════ */
+export default function SecureEmail() {
+  const [tab, setTab]         = useState("compose"); // compose | inbox
+  const [to, setTo]           = useState([]);
+  const [cc, setCc]           = useState([]);
+  const [subject, setSubject] = useState("");
+  const [body, setBody]       = useState("");
+  const [algo, setAlgo]       = useState("AES-256-GCM");
+  const [secretKey, setKey]   = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [mode, setMode]       = useState("encrypt"); // encrypt | decrypt
+  const [output, setOutput]   = useState("");
+  const [processing, setProc] = useState(false);
+  const [done, setDone]       = useState(false);
+  const [error, setError]     = useState("");
+  const [emails, setEmails]   = useState([]);
+  const [showCC, setShowCC]   = useState(false);
+
+  const MAX = 20000;
+  const accent = "#0ea5e9";
+
+  /* ── process ── */
+  const handleProcess = () => {
+    if (!body.trim()) { setError("Email body cannot be empty."); return; }
+    setError(""); setProc(true); setDone(false);
+    setTimeout(() => {
+      if (mode === "encrypt") {
+        const result = encryptText(body, secretKey, algo);
+        if (result) { setOutput(result); setDone(true); }
+        else        { setError("Encryption failed."); }
+      } else {
+        const { ok, result } = decryptText(body, secretKey, algo);
+        if (ok) { setOutput(result); setDone(true); }
+        else    { setError(result); }
+      }
+      setProc(false);
+    }, 500);
+  };
+
+  /* ── send (save to inbox simulation) ── */
+  const handleSend = () => {
+    if (!output || mode !== "encrypt") {
+      setError("Encrypt the email body first before sending."); return;
+    }
+    if (to.length === 0) { setError("Add at least one recipient."); return; }
+    const entry = {
+      id: crypto.randomUUID(),
+      to, cc, subject,
+      algo,
+      encryptedBody: output,
+      decryptedBody: null,
+      decrypted: false,
+      sentAt: new Date().toLocaleTimeString(),
+    };
+    setEmails(prev => [entry, ...prev]);
+    // reset compose
+    setTo([]); setCc([]); setSubject(""); setBody("");
+    setOutput(""); setDone(false); setError("");
+    setTab("inbox");
+  };
+
+  /* ── decrypt from inbox ── */
+  const handleInboxDecrypt = (id, decryptedBody) => {
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, decrypted: true, decryptedBody } : e));
+  };
+
+  /* ── swap ── */
+  const handleSwap = () => {
+    if (!output) return;
+    setBody(output); setOutput(""); setDone(false);
+    setMode(m => m === "encrypt" ? "decrypt" : "encrypt");
+  };
+
+  const switchMode = (m) => { setMode(m); setOutput(""); setError(""); setDone(false); };
+
+  const accentGrad = mode === "encrypt"
+    ? "linear-gradient(135deg,#10b981,#0ea5e9)"
+    : "linear-gradient(135deg,#0ea5e9,#a78bfa)";
+  const modeAccent = mode === "encrypt" ? "#10b981" : "#0ea5e9";
+
+  return (
+    <div style={{ padding: "32px 36px", fontFamily: "'Outfit',sans-serif", minHeight: "100vh", background: "#060910", color: "#f1f5f9" }}>
+      <style>{`
+        @keyframes spin   { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .fade-up  { animation: fadeUp .35s ease both; }
+        .mono     { font-family:'JetBrains Mono',monospace; }
+        textarea::placeholder { color:#1e3a5f !important; }
+        input::placeholder    { color:#1e3a5f !important; }
+        ::-webkit-scrollbar       { width:6px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:#1e2d40; border-radius:3px; }
+      `}</style>
+
+      {/* ── Header ── */}
+      <div className="fade-up" style={{ marginBottom: 28 }}>
+        <p className="mono" style={{ fontSize: 11, color: "#334155", letterSpacing: "0.14em", marginBottom: 6 }}>
+          CRYPTIFY · SECURE EMAIL MODULE
+        </p>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: "#f1f5f9", margin: "0 0 4px" }}>
+          Secure{" "}
+          <span style={{ background: "linear-gradient(135deg,#0ea5e9,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            Email
+          </span>
+        </h2>
+        <p style={{ fontSize: 14, color: "#475569", margin: 0 }}>
+          Compose, encrypt, and decrypt emails end-to-end using your chosen algorithm.
+        </p>
+      </div>
+
+      {/* ── Tab Bar ── */}
+      <div className="fade-up" style={{ display: "flex", gap: 0, marginBottom: 24, borderRadius: 12, border: "1px solid #1e2d40", background: "#060910", overflow: "hidden", width: "fit-content" }}>
+        {[
+          { id: "compose", icon: "edit",  label: "COMPOSE"  },
+          { id: "inbox",   icon: "inbox", label: `SENT (${emails.length})` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "11px 28px", border: "none", cursor: "pointer",
+            fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 13,
+            letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 8,
+            transition: "all .2s",
+            background: tab === t.id ? "#0ea5e918" : "transparent",
+            color: tab === t.id ? "#0ea5e9" : "#334155",
+            borderBottom: tab === t.id ? "2px solid #0ea5e9" : "2px solid transparent",
+          }}>
+            <Icon n={t.icon} s={14} c={tab === t.id ? "#0ea5e9" : "#334155"} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ════════════════════════════════
+          COMPOSE TAB
+      ════════════════════════════════ */}
+      {tab === "compose" && (
+        <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "start" }}>
+
+          {/* LEFT: Email Form */}
+          <div style={{ background: "#0d1421", border: "1px solid #1e2d40", borderRadius: 16, overflow: "hidden" }}>
+
+            {/* Form header */}
+            <div style={{ padding: "14px 20px", borderBottom: "1px solid #0f1e2e", background: "#060910", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "#0ea5e918", border: "1px solid #0ea5e930", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon n="mail" s={14} c="#0ea5e9" />
+              </div>
+              <span className="mono" style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>NEW MESSAGE</span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                <button onClick={() => setShowCC(v => !v)} style={{
+                  padding: "4px 10px", borderRadius: 8, border: "1px solid #1e2d40", background: "transparent",
+                  fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#334155", cursor: "pointer",
+                }}>
+                  {showCC ? "HIDE CC" : "ADD CC"}
+                </button>
+              </div>
+            </div>
+
+            {/* To */}
+            <TagInput label="To" icon="at" tags={to} setTags={setTo} placeholder="recipient@example.com — press Enter" />
+
+            {/* CC */}
+            {showCC && (
+              <TagInput label="CC" icon="user" tags={cc} setTags={setCc} placeholder="cc@example.com — press Enter" />
+            )}
+
+            {/* Subject */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #0f1e2e", padding: "12px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 60 }}>
+                <Icon n="tag" s={13} c="#334155" />
+                <span style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>Subject</span>
+              </div>
+              <input
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                placeholder="Email subject"
+                style={{
+                  flex: 1, background: "transparent", border: "none", outline: "none",
+                  fontFamily: "'Outfit',sans-serif", fontSize: 13, color: "#94a3b8",
+                }}
+              />
+            </div>
+
+            {/* Body */}
+            <div style={{ position: "relative" }}>
+              <textarea
+                value={body}
+                onChange={e => { if (e.target.value.length <= MAX) setBody(e.target.value); setError(""); setDone(false); setOutput(""); }}
+                placeholder="Write your email message here…"
+                style={{
+                  width: "100%", boxSizing: "border-box", minHeight: 260,
+                  padding: "18px 20px", background: "transparent", border: "none", outline: "none", resize: "vertical",
+                  fontFamily: "'Outfit',sans-serif", fontSize: 14, color: "#94a3b8", lineHeight: 1.7,
+                }}
+              />
+              <div style={{ position: "absolute", bottom: 10, right: 14 }}>
+                <span className="mono" style={{ fontSize: 10, color: body.length > 18000 ? "#ef4444" : "#1e3a5f" }}>
+                  {body.length.toLocaleString()}/{MAX.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ margin: "0 16px 16px", padding: "10px 14px", borderRadius: 10, background: "#2d0d0d", border: "1px solid #ef444440", display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon n="x" s={13} c="#ef4444" />
+                <span style={{ fontSize: 12, color: "#f87171" }}>{error}</span>
+              </div>
+            )}
+
+            {/* Action bar */}
+            <div style={{ padding: "14px 20px", borderTop: "1px solid #0f1e2e", background: "#060910", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={handleProcess} disabled={processing || !body.trim()} style={{
+                padding: "10px 22px", borderRadius: 10, border: "none",
+                cursor: (processing || !body.trim()) ? "not-allowed" : "pointer",
+                background: (processing || !body.trim()) ? "#1e3a5f" : accentGrad,
+                color: (processing || !body.trim()) ? "#475569" : "#fff",
+                fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 13,
+                display: "flex", alignItems: "center", gap: 7, transition: "all .2s",
+              }}>
+                {processing
+                  ? <div style={{ width: 15, height: 15, border: "2px solid #47556930", borderTopColor: "#94a3b8", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
+                  : <Icon n={mode === "encrypt" ? "lock" : "unlock"} s={14} c={(processing || !body.trim()) ? "#475569" : "#fff"} />
+                }
+                {processing ? (mode === "encrypt" ? "ENCRYPTING…" : "DECRYPTING…") : (mode === "encrypt" ? "ENCRYPT BODY" : "DECRYPT BODY")}
+              </button>
+
+              {output && (
+                <button onClick={handleSwap} title="Swap output → body" style={{
+                  width: 36, height: 36, borderRadius: 10, border: "1px solid #1e2d40",
+                  background: "#0a1628", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Icon n="swap" s={15} c="#475569" />
+                </button>
+              )}
+
+              {mode === "encrypt" && done && (
+                <button onClick={handleSend} style={{
+                  marginLeft: "auto", padding: "10px 22px", borderRadius: 10, border: "none", cursor: "pointer",
+                  background: "linear-gradient(135deg,#10b981,#0ea5e9)",
+                  fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 13, color: "#fff",
+                  display: "flex", alignItems: "center", gap: 7,
+                }}>
+                  <Icon n="send" s={14} c="#fff" /> SEND ENCRYPTED
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT: Controls + Output */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Mode + Algo */}
+            <div style={{ background: "#0d1421", border: "1px solid #1e2d40", borderRadius: 16, padding: "18px 20px" }}>
+              <p className="mono" style={{ fontSize: 10, color: "#334155", fontWeight: 700, letterSpacing: "0.10em", marginBottom: 14 }}>
+                CIPHER SETTINGS
+              </p>
+
+              {/* Mode toggle */}
+              <div style={{ display: "flex", borderRadius: 10, border: "1px solid #1e2d40", overflow: "hidden", marginBottom: 14 }}>
+                {[
+                  { id: "encrypt", label: "ENCRYPT", icon: "lock",   color: "#10b981" },
+                  { id: "decrypt", label: "DECRYPT", icon: "unlock", color: "#0ea5e9" },
+                ].map(m => (
+                  <button key={m.id} onClick={() => switchMode(m.id)} style={{
+                    flex: 1, padding: "10px", border: "none", cursor: "pointer",
+                    fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 12,
+                    letterSpacing: "0.08em", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    transition: "all .2s",
+                    background: mode === m.id ? `${m.color}18` : "transparent",
+                    color: mode === m.id ? m.color : "#334155",
+                    borderBottom: mode === m.id ? `2px solid ${m.color}` : "2px solid transparent",
+                  }}>
+                    <Icon n={m.icon} s={13} c={mode === m.id ? m.color : "#334155"} />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Algo */}
+              <p style={{ fontSize: 11, color: "#334155", fontWeight: 600, marginBottom: 8 }}>Algorithm</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                {ALGOS.map(a => (
+                  <button key={a} onClick={() => { setAlgo(a); setOutput(""); setDone(false); }} style={{
+                    padding: "9px 14px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    border: algo === a ? "1px solid #0ea5e944" : "1px solid #1e2d40",
+                    background: algo === a ? "#0ea5e910" : "#060910",
+                    fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700,
+                    color: algo === a ? "#0ea5e9" : "#334155", transition: "all .2s",
+                    display: "flex", alignItems: "center", gap: 8,
+                  }}>
+                    {algo === a && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#0ea5e9", flexShrink: 0 }} />}
+                    {a}
+                  </button>
+                ))}
+              </div>
+
+              {/* Secret key */}
+              <p style={{ fontSize: 11, color: "#334155", fontWeight: 600, marginBottom: 8 }}>Secret Key</p>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showKey ? "text" : "password"}
+                  value={secretKey}
+                  onChange={e => setKey(e.target.value)}
+                  placeholder="Passphrase (blank = default)"
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "10px 40px 10px 14px",
+                    background: "#060910", border: "1px solid #1e2d40", borderRadius: 10, outline: "none",
+                    fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#94a3b8",
+                  }}
+                />
+                <button onClick={() => setShowKey(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", display: "flex" }}>
+                  <Icon n={showKey ? "eyeoff" : "eye"} s={15} c="#475569" />
+                </button>
+              </div>
+            </div>
+
+            {/* Output panel */}
+            <div style={{ background: "#0d1421", border: `1px solid ${done ? modeAccent + "55" : "#1e2d40"}`, borderRadius: 16, overflow: "hidden", transition: "border-color .3s" }}>
+              <div style={{ padding: "13px 16px", borderBottom: "1px solid #0f1e2e", background: "#060910", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 7, background: done ? modeAccent + "18" : "#1e2d4022", border: `1px solid ${done ? modeAccent + "44" : "#1e2d40"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .3s" }}>
+                    <Icon n={mode === "encrypt" ? "lock" : "mail"} s={12} c={done ? modeAccent : "#334155"} />
+                  </div>
+                  <span className="mono" style={{ fontSize: 10, color: done ? modeAccent : "#334155", fontWeight: 700, transition: "color .3s" }}>
+                    {mode === "encrypt" ? "ENCRYPTED OUTPUT" : "DECRYPTED OUTPUT"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {output && <span className="mono" style={{ fontSize: 10, color: "#334155" }}>{output.length.toLocaleString()} chars</span>}
+                  <CopyBtn text={output} small />
+                </div>
+              </div>
+
+              <div style={{ minHeight: 180, padding: "14px 16px", display: "flex", alignItems: output ? "flex-start" : "center", justifyContent: output ? "flex-start" : "center" }}>
+                {output ? (
+                  <pre style={{
+                    margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", flex: 1,
+                    fontFamily: mode === "encrypt" ? "'JetBrains Mono',monospace" : "'Outfit',sans-serif",
+                    fontSize: mode === "encrypt" ? 11 : 13,
+                    color: modeAccent + "cc", lineHeight: 1.6,
+                  }}>{output}</pre>
+                ) : (
+                  <div style={{ textAlign: "center", opacity: 0.3 }}>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>{mode === "encrypt" ? "🔏" : "📧"}</div>
+                    <p className="mono" style={{ fontSize: 10, color: "#1e3a5f", margin: 0 }}>
+                      {processing ? "PROCESSING…" : "OUTPUT APPEARS HERE"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Success toast inline */}
+            {done && (
+              <div className="fade-up" style={{ padding: "12px 16px", borderRadius: 12, background: "#052e16", border: "1px solid #10b98133", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#064e3b", border: "1px solid #10b981", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon n="check" s={13} c="#10b981" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", margin: 0 }}>
+                    {mode === "encrypt" ? "Body encrypted! Ready to send." : "Body decrypted successfully!"}
+                  </p>
+                  <p className="mono" style={{ fontSize: 10, color: "#10b98199", marginTop: 2 }}>
+                    {algo} · {output.length.toLocaleString()} chars
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════
+          INBOX / SENT TAB
+      ════════════════════════════════ */}
+      {tab === "inbox" && (
+        <div className="fade-up">
+          {emails.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", opacity: 0.4 }}>
+              <Icon n="inbox" s={44} c="#1e3a5f" />
+              <p className="mono" style={{ fontSize: 12, color: "#1e3a5f", marginTop: 14 }}>
+                NO SENT EMAILS YET
+              </p>
+              <p style={{ fontSize: 13, color: "#334155", marginTop: 6 }}>
+                Compose and send an encrypted email to see it here.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Info banner */}
+              <div style={{ padding: "12px 16px", borderRadius: 12, background: "#0c1a3a", border: "1px solid #0ea5e920", display: "flex", alignItems: "center", gap: 10 }}>
+                <Icon n="info" s={14} c="#0ea5e9" />
+                <span style={{ fontSize: 12, color: "#0ea5e9" }}>
+                  Expand any email to view the encrypted body or decrypt it inline.
+                </span>
+              </div>
+
+              {emails.map(email => (
+                <EmailCard
+                  key={email.id}
+                  email={email}
+                  onDecrypt={(body) => handleInboxDecrypt(email.id, body)}
+                  onDelete={() => setEmails(prev => prev.filter(e => e.id !== email.id))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
